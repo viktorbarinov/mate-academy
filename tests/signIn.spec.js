@@ -26,7 +26,7 @@ Object.values(INVALID_USER_CREDENTIALS).forEach((data) => {
     test(`should show error and prevent Sign In with invalid credentials: ${data.name}`, async ({page}) => {
         await signInPage.signIn(data.email, data.password)
 
-        await expect(page).toHaveURL(URLs.loginPage);
+        await expect(page).toHaveURL(URLs.login_page);
         await expect(signInPage.validationErrorMessage).toHaveText(data.error_message);
         await expect(navigationBar.profileLink).not.toBeVisible();
     });

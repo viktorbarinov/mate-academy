@@ -1,7 +1,8 @@
 export const URLs = {
-    loginPage: `/user/login`,
-    createArticlePage: '/editor',
-    profilePage: '/profile/{username}'
+    login_page: `/user/login`,
+    create_article_page: '/editor',
+    article_page: '/article/{slug}',
+    profile_page: '/profile/{username}'
 }
 
 export const API_URLs = {

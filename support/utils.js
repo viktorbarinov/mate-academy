@@ -9,7 +9,7 @@ export function createRandomString(length = 5) {
     return result;
 }
 
-async function setLocalStorage(page, userData) {
+async function setUserIntoLocalStorage(page, userData) {
     await page.goto('/', { waitUntil: 'load' });
 
     await page.evaluate((data) => {
@@ -17,7 +17,7 @@ async function setLocalStorage(page, userData) {
     }, userData);
 }
 
-async function addAuthCookies(page, token) {
+async function addUserAuthCookies(page, token) {
     await page.context().addCookies([{
         name: 'auth',
         value: token,
@@ -28,9 +28,9 @@ async function addAuthCookies(page, token) {
 }
 
 export async function setUpLogin(page, request, email, password) {
-    const responseBody = LoginApiService.loginViaApi(request, email, password);
+    const responseBody = await LoginApiService.loginViaApi(request, email, password);
 
-    await setLocalStorage(page, {
+    await setUserIntoLocalStorage(page, {
         bio: null,
         effectiveImage: "https://static.productionready.io/images/smiley-cyrus.jpg",
         image: null,
@@ -39,6 +39,12 @@ export async function setUpLogin(page, request, email, password) {
         token: responseBody.user.token
     });
 
-    await addAuthCookies(page, responseBody.user.token);
+    await addUserAuthCookies(page, responseBody.user.token);
     await page.reload();
+}
+
+export async function getUserAuthToken(page) {
+    const cookies = await page.context().cookies();
+    const authCookie = cookies.find(cookie => cookie.name === 'auth');
+    return authCookie ? authCookie.value : null;
 }

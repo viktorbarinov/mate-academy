@@ -12,7 +12,7 @@ exports.SignInPage = class SignInPage {
     }
 
     async open() {
-        await this.page.goto(URLs.loginPage);
+        await this.page.goto(URLs.login_page);
     }
 
     async signIn(email, password) {

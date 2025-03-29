@@ -2,102 +2,111 @@
 import {expect, test} from '@playwright/test';
 import {CreateArticlePage} from "../support/pageObjects/createArticlePage";
 import {USERS} from "../fixtures/variables/users";
-import {createRandomString, setUpLogin} from "../support/utils";
-import {ArticlesApiService} from "../support/api/articlesApiService";
+import {createRandomString, getUserAuthToken, setUpLogin} from "../support/utils";
 import {URLs} from "../fixtures/variables/urls";
+import {ArticlesApiService} from "../support/api/articlesApiService";
 import {MyPosts} from "../support/pageObjects/myPostsPage";
+import {ArticlePage} from "../support/pageObjects/articlePage";
+import {VALID_ARTICLE_DATA} from "../fixtures/testsData/validArticleData";
 
-const articleData = {
-    title: 'Default Title',
-    description: 'Default Description',
-    body: 'Default Body',
-    tags: ['tag1', 'tag2']
-}
-
-test.beforeAll(async ({page}) => {
-    await setUpLogin(page, request, USERS.regular_user.email, USERS.regular_user.password)
-})
+let seed;
+let articleTitle;
+let createdArticleSlug;
+let createArticlePage;
+let myPostsPage;
+let articlePage;
 
 test.describe('verify Article creation', () => {
 
-    let request;
-    let createArticlePage;
-    let seed;
-    let articleTitle;
+    test.beforeEach(async ({page, request}) => {
+        seed = createRandomString();
+        articleTitle = `${VALID_ARTICLE_DATA.title} ${seed}`;
+        createArticlePage = new CreateArticlePage(page);
 
-    test.beforeEach(async ({page, request: apiRequest}) => {
-        seed = createRandomString()
-        articleTitle = `${articleData.title} ${seed}`;
-        request = apiRequest;
-        createArticlePage = new CreateArticlePage(page)
-
-        await createArticlePage.open()
+        await setUpLogin(page, request, USERS.regular_user.email, USERS.regular_user.password);
+        await createArticlePage.open();
     });
 
-    test('should successfully create Article with only required fields', async () => {
+    test('should successfully create Article with only required fields', async ({page}) => {
         await createArticlePage.createArticle({
             title: articleTitle,
-            description: articleData.description,
-            body: articleData.body
-        })
+            description: VALID_ARTICLE_DATA.description,
+            body: VALID_ARTICLE_DATA.body
+        });
+
+        createdArticleSlug = await createArticlePage.getArticleSlugAfterCreation(page, articleTitle);
+
+        await expect(page).toHaveURL(URLs.article_page.replace('{slug}', createdArticleSlug));
     });
 
-    test('should successfully create Article with all fields', async () => {
+    test('should successfully create Article with all fields', async ({page}) => {
         await createArticlePage.createArticle({
             title: articleTitle,
-            description: articleData.description,
-            body: articleData.body,
-            tags: articleData.tags
-        })
+            description: VALID_ARTICLE_DATA.description,
+            body: VALID_ARTICLE_DATA.body,
+            tags: VALID_ARTICLE_DATA.tags
+        });
+
+        createdArticleSlug = await createArticlePage.getArticleSlugAfterCreation(page, articleTitle);
+
+        await expect(page).toHaveURL(URLs.article_page.replace('{slug}', createdArticleSlug));
     });
 
-    test.afterEach(async () => {
-        try {
-            await ArticlesApiService.deleteArticle(request, articleTitle);
-        } catch (error) {
-            console.warn(`Failed to delete article: ${error.message}`);
-        }
-    })
+    test.afterEach(async ({page, request}) => {
+        const userAuthToken = await getUserAuthToken(page);
+        await ArticlesApiService.deleteArticle(request, createdArticleSlug, userAuthToken);
+    });
 })
 
 test.describe('verify Article displaying and data', () => {
 
-    const titleLabel = 'Article title: ';
-    const descriptionLabel = 'Article description: ';
+    test.beforeEach(async ({page, request}) => {
+        seed = createRandomString();
+        articleTitle = `${VALID_ARTICLE_DATA.title} ${seed}`;
 
-    let request;
-    let createArticlePage;
-    let myPosts;
-    let seed;
-    let articleTitle;
+        createArticlePage = new CreateArticlePage(page);
+        myPostsPage = new MyPosts(page);
+        articlePage = new ArticlePage(page);
 
-    test.beforeAll(async ({page, request: apiRequest}) => {
-        seed = createRandomString()
-        articleTitle = `${articleData.title} ${seed}`;
-        request = apiRequest;
-        createArticlePage = new CreateArticlePage(page)
-        myPosts = new MyPosts(page)
+        await setUpLogin(page, request, USERS.regular_user.email, USERS.regular_user.password);
 
-        await createArticlePage.open()
-
+        await createArticlePage.open();
         await createArticlePage.createArticle({
             title: articleTitle,
-            description: articleData.description,
-            body: articleData.body,
-            tags: articleData.tags
-        })
+            description: VALID_ARTICLE_DATA.description,
+            body: VALID_ARTICLE_DATA.body,
+            tags: VALID_ARTICLE_DATA.tags
+        });
+
+        createdArticleSlug = await createArticlePage.getArticleSlugAfterCreation(page, articleTitle);
     });
 
     test('should display created Article with proper data on "Profile" page', async ({page}) => {
-        const articleTitleInfo = titleLabel + articleTitle;
-        const articleDescriptionInfo = descriptionLabel + articleData.description;
+        const articleTitleInfo = `Article title: ${articleTitle}`;
+        const articleDescriptionInfo = `Article description: ${VALID_ARTICLE_DATA.description}`;
 
-        const slug = await ArticlesApiService.getArticleSlugByTitle(request, articleTitle)
+        await page.goto(URLs.profile_page.replace('{username}', USERS.regular_user.userName));
 
-        await page.goto(URLs.profilePage.replace('{username}', USERS.regular_user.userName))
+        await expect(myPostsPage.articleTitleInfo(createdArticleSlug)).toHaveText(articleTitleInfo);
+        await expect(myPostsPage.articleDescriptionInfo(createdArticleSlug)).toHaveText(articleDescriptionInfo);
+        await myPostsPage.articleTagPill(createdArticleSlug).allTextContents().then((articleTags) => {
+            expect(articleTags).toEqual(VALID_ARTICLE_DATA.tags);
+        });
+    });
 
-        await expect(myPosts.articleTitleInfo.replace('{slug}', slug)).toHaveText(articleTitleInfo);
-        await expect(myPosts.articleDescriptionInfo.replace('{slug}', slug)).toHaveText(articleDescriptionInfo);
+    test('should display created Article with proper data on "Article" page', async ({page}) => {
+        await page.goto(URLs.article_page.replace('{slug}', createdArticleSlug));
+
+        await expect(articlePage.articleTitleInfo).toHaveText(articleTitle);
+        await expect(articlePage.articleBodyInfo).toHaveText(VALID_ARTICLE_DATA.body);
+        await articlePage.articleTagPill.allTextContents().then((articleTags) => {
+            expect(articleTags).toEqual(VALID_ARTICLE_DATA.tags);
+        });
+    });
+
+    test.afterEach(async ({page, request}) => {
+        const userAuthToken = await getUserAuthToken(page);
+        await ArticlesApiService.deleteArticle(request, createdArticleSlug, userAuthToken);
     });
 
 })
