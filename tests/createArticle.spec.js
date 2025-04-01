@@ -58,7 +58,7 @@ test.describe('verify Article creation', () => {
     });
 })
 
-test.describe('verify Article displaying and data', () => {
+test.describe('verify Article data displaying after creation', () => {
 
     test.beforeEach(async ({page, request}) => {
         seed = createRandomString();
